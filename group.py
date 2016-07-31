@@ -145,7 +145,6 @@ def merge_users_values(ulist,chat_id):
     for u in ulist:
         print(u)
         user = users.search(query.id == u)[0]
-        user = users.search(query.id == u)[0]
         for t in user["types"]:
             if not playlist.get(t)==None:
                 playlist[t] = playlist[t]+1

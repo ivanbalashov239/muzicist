@@ -13,14 +13,19 @@ import group
 
 import muzisapi
 import pylast
+import config
 
 help_text = 'This is muzicist bot ' \
 
 users = TinyDB('users.json')
 chats = TinyDB('chats.json')
 
+with open('types.json') as data_file:    
+    types = json.load(data_file)
+
 
 parser = muzisapi.BaseParseClass()
+lastfm_network = pylast.LastFMNetwork(api_key=config.fm_API_KEY, api_secret=config.fm_API_SECRET)
 
 
 # Set up logging
@@ -33,6 +38,37 @@ logging.basicConfig(level=logging.DEBUG,
 logger = logging.getLogger(__name__)
 
 
+def lastfm(bot, update, args):
+    print("lastfm")
+
+    chat_id = update.message.chat_id
+      # try:
+    # user = lastfm.User("LiBerfm")
+    query = Query()
+    message = update.message.to_dict()
+    uid = str(message['from']["id"])
+    
+    try:
+        # args[0] should contain the time for the timer in seconds
+        fmname = str(args[0])
+        user = lastfm_network.get_user(fmname)
+        top_tags = user.get_top_tags()
+        user_tags = users.search(query.id == uid)[0]["types"]
+        for i in top_tags:
+            tag =types["lastfm"].get(str(i.item))
+            if (not tag == None) and (not tag in user_tags):
+                user_tags.append(tag)
+
+        users.update({"types":user_tags}, query.id == uid)
+    except IndexError:
+        bot.sendMessage(chat_id, text='Usage: /lastfm <username>')
+    except ValueError:
+        bot.sendMessage(chat_id, text='Usage: /lastfm <username>')
+
+    # print(top_tags)
+      # except:
+        # print("some network thing probably happened and this wrapper tried to kill my program")
+        # queue[curUser[0]] = newUserInfo
 
 # Print help text
 def help(bot, update):

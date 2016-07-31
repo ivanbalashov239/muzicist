@@ -61,6 +61,11 @@ handler ={
             "supergroup":group.connect,
             "private":group.connect,
             },
+        "lastfm":{
+            "group":private.lastfm,
+            "supergroup":private.lastfm,
+            "private":private.lastfm,
+            },
         }
 
 
@@ -87,6 +92,8 @@ def help(bot,update):
 
 def playlist(bot,update):
     handler["playlist"][update.message.chat.type](bot,update)
+def lastfm(bot,update,args):
+    handler["lastfm"][update.message.chat.type](bot,update,args)
 
 def button(bot,update):
     handler["button"][update.callback_query.message.chat.type](bot,update)
@@ -106,6 +113,7 @@ def main():
     dp.add_handler(CommandHandler("start", start))
     dp.add_handler(CommandHandler("help", help))
     dp.add_handler(CommandHandler("playlist", playlist))
+    dp.add_handler(CommandHandler("lastfm", lastfm, pass_args=True))
     
     dp.add_handler(CallbackQueryHandler(button))
     dp.add_handler(MessageHandler([Filters.status_update], status_update))
