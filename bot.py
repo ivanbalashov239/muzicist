@@ -10,7 +10,7 @@ from tinydb import TinyDB, Query, operations
 import traceback
 import json
 import group
-import personal
+import private
 import config
 
 import muzisapi
@@ -34,28 +34,33 @@ handler ={
         "start":{
             "group":group.start,
             "supergroup":group.start,
-            "personal":personal.start,
+            "private":private.start,
             },
         "help":{
             "group":group.help,
             "supergroup":group.help,
-            "personal":personal.help,
+            "private":private.help,
             },
         "button":{
             "group":group.button,
             "supergroup":group.button,
-            "personal":personal.button,
+            "private":group.button,
             },
         "playlist":{
             "group":group.playlist,
             "supergroup":group.playlist,
-            "personal":personal.playlist,
+            "private":group.playlist,
             },
         "status_update":{
             "group":group.status_update,
             "supergroup":group.status_update,
-            "personal":none,
-            }
+            "private":none,
+            },
+        "connect":{
+            "group":group.connect,
+            "supergroup":group.connect,
+            "private":group.connect,
+            },
         }
 
 
@@ -93,6 +98,7 @@ def main():
     # Create the Updater and pass it your bot's token.
     updater = Updater(config.TOKEN, workers=config.WORKERS)
     j = updater.job_queue
+    group.job_queue = j
 
     # Get the dispatcher to register handlers
     dp = updater.dispatcher

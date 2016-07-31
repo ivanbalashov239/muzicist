@@ -4,7 +4,7 @@ import logging
 import sys
 from telegram import Emoji, ParseMode, TelegramError, Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (Updater, CommandHandler, MessageHandler, Filters, StringRegexHandler,
-                          ConversationHandler, StringCommandHandler, CallbackQueryHandler, )
+                          ConversationHandler, StringCommandHandler, CallbackQueryHandler, Job )
 # from telegram.dispatcher import run_async
 from tinydb import TinyDB, Query, operations
 import traceback
@@ -19,6 +19,7 @@ help_text = 'Welcomes everyone that enters a group chat that this bot is a ' \
 # Create database object
 chats = TinyDB('chats.json')
 users = TinyDB('users.json')
+playlistjobs = {}
 
 # playlists={}
 
@@ -68,7 +69,10 @@ def start(bot, update):
 def addUser(uid,name,bot,update):
     query=Query()
     uid = str(uid)
-    groupid = str(update.callback_query.message.chat.id)
+    if update.callback_query:
+        groupid = str(update.callback_query.message.chat.id)
+    else:
+        groupid = update.message.chat.id
     if not users.search(query["id"] == uid):
         users.insert({"id":uid,"username":name,"types":[]})
     else:
@@ -109,8 +113,13 @@ def disconnect(bot,update):
                                 chat_id=groupid)
     print("disconnect")
 
+
+
 def playlist(bot,update):
-    chat_id = str(update.message.chat.id)
+    if update.callback_query:
+        chat_id = str(update.callback_query.message.chat.id)
+    else:
+        chat_id = str(update.message.chat.id)
     query = Query()
     chat = chats.search(query.id == chat_id)[0]
     group_users = chat["users"]
@@ -126,7 +135,7 @@ def playlist(bot,update):
     # values = ""
 
     print(values)
-    push_playlist(bot,update,parser.stream_from_values(values=values,size=10,operator="OR"))
+    push_playlist(bot,update,parser.stream_from_values(values=values,size=5,operator="OR"))
 def merge_users_values(ulist,chat_id):
     query=Query()
     # playlist = playlists[chat_id]
@@ -152,9 +161,13 @@ def merge_users_values(ulist,chat_id):
     return values
 
 def push_playlist(bot,update,songs):
-    bot.sendMessage(update.message.chat_id, text="Playlist")
+    # bot.sendMessage(update.message.chat_id, text="Playlist")
+    if update.callback_query:
+        chat_id = str(update.callback_query.message.chat.id)
+    else:
+        chat_id = str(update.message.chat.id)
     for s in songs:
-        bot.sendAudio(update.message.chat_id, audio=open(parser.get(s['file_mp3']), 'rb'),title=s["track_name"],performer=s["performer"],disable_notification=True)
+        bot.sendAudio(chat_id, audio=open(parser.get(s['file_mp3']), 'rb'),title=s["track_name"],performer=s["performer"],disable_notification=True)
         
 
 def button(bot, update):
@@ -171,13 +184,33 @@ def connect(bot,update):
     if addUser(user_id,username, bot, update):
         bot.sendMessage(text="@%s, вы учтены при составлении плейлиста" % (username),
                             chat_id=query.message.chat_id)
-    else:
-        bot.sendMessage(text="@%s, вы уже были учтены при составлении плейлиста" % (username),
-                            chat_id=query.message.chat_id)
+    # else:
+        # bot.sendMessage(text="@%s, вы уже были учтены при составлении плейлиста" % (username),
+                            # chat_id=query.message.chat_id)
 
 def play(bot,update):
+    if update.callback_query:
+        q = update.callback_query
+        qd = q.to_dict()
+        uid = qd['from']['id']
+        groupid = str(update.callback_query.message.chat.id)
+    def callback_play(bot, job):
+        print(play)
+        playlist(bot,update)
+        # job.schedule_removal()
+
+    playlistjobs[groupid]=Job(callback_play,60)
+    job_queue.put(playlistjobs[groupid],next_t=0.0)
+
     return
 def stop(bot,update):
+    if update.callback_query:
+        q = update.callback_query
+        qd = q.to_dict()
+        uid = qd['from']['id']
+        groupid = str(update.callback_query.message.chat.id)
+    if playlistjobs.get(groupid):
+        playlistjobs[groupid].schedule_removal()
     return
 
 callback = {"connect":connect,"disconnect":disconnect,"play":play,"stop":stop}

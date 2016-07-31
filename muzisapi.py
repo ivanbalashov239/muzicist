@@ -75,6 +75,8 @@ class BaseParseClass(object):
         def addParams(value,name,params):
             if value is not None:
                 params[name]=value
+        if values == []:
+            return []
         addParams(values,"values",params)
         addParams(size,"size",params)
         addParams(operator,"operator",params)
