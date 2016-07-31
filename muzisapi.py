@@ -18,16 +18,6 @@ def set_keys(app_id, api_key):
             }
 
 
-    # class Song(object):
-        # int type
-        # string track_name
-        # string performer
-        # string poster
-        # int timestudy
-        # int performer_id
-        # int[] performers
-        # string lyrics
-        # string file_mp4
 class BaseParseClass(object):
         # _connection_error_message = ('Cannot connect to muzis.ru')
     # _parse_special_classes = ['users', 'login', 'roles', 'files', 'events',

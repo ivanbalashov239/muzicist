@@ -1,16 +1,4 @@
 #!/usr/bin/env python3
-help_text = 'Welcomes everyone that enters a group chat that this bot is a ' \
-            'part of. By default, only the person who invited the bot into ' \
-            'the group is able to change settings.\nCommands:\n\n' \
-            '/welcome - Set welcome message\n' \
-            '/goodbye - Set goodbye message\n' \
-            '/disable\\_goodbye - Disable the goodbye message\n' \
-            '/lock - Only the person who invited the bot can change messages\n'\
-            '/unlock - Everyone can change messages\n\n' \
-            'You can use _$username_ and _$title_ as placeholders when setting'\
-            ' messages.\n' \
-            'Please [rate me](http://storebot.me/bot/examplebot) :) ' \
-            'Questions? Message my creator @exampleuser'
 import logging
 
 import sys
@@ -21,21 +9,12 @@ from telegram.ext import (Updater, CommandHandler, MessageHandler, Filters, Stri
 from tinydb import TinyDB, Query, operations
 import traceback
 import json
+import config
 
 import muzisapi
 
 help_text = 'Welcomes everyone that enters a group chat that this bot is a ' \
-            'part of. By default, only the person who invited the bot into ' \
-            'the group is able to change settings.\nCommands:\n\n' \
-            '/welcome - Set welcome message\n' \
-            '/goodbye - Set goodbye message\n' \
-            '/disable\\_goodbye - Disable the goodbye message\n' \
-            '/lock - Only the person who invited the bot can change messages\n'\
-            '/unlock - Everyone can change messages\n\n' \
-            'You can use _$username_ and _$title_ as placeholders when setting'\
-            ' messages.\n' \
-            'Please [rate me](http://storebot.me/bot/examplebot) :) ' \
-            'Questions? Message my creator @exampleuser'
+            'part of. This bot can create playlist that all of you will like'
 
 # Create database object
 chats = TinyDB('chats.json')
@@ -64,32 +43,27 @@ logger = logging.getLogger(__name__)
 # Print help text
 def help(bot, update):
     """ Prints help text """
+    bot.sendMessage(update.message.chat_id, text=help_text)
 
-    chat_id = update.message.chat.id
-
-    # bot.sendMessage(chat_id=chat_id,
-                    # text=help_text,
-                    # parse_mode=ParseMode.MARKDOWN,
-                    # disable_web_page_preview=True)
-    keyboard = [[InlineKeyboardButton("Подключиться", callback_data='connect')]]
-
-    reply_markup = InlineKeyboardMarkup(keyboard)
-
-    bot.sendMessage(update.message.chat_id, text="Нажмите, что бы ваши предпочтения были учитаны при составлении плейлиста", reply_markup=reply_markup)
 
 #starts the chat
 def start(bot, update):
     """ Prints help text """
 
     print("start")
-    chat_id = update.message.chat.id
-    query = Query()
-    # playlists[str(chat_id)] = {}
-    if not chats.search(query["id"] == str(chat_id)):
-        chats.insert({"id":str(chat_id),"type":update.message.chat.type,"lock":True,"quiet":False,"welcome":"hi","goodbye":"bye","users":[]})
-    else:
-        chats.update({"type":update.message.chat.type}, query.id == str(chat_id))
     help(bot,update)
+    chat_id = update.message.chat.id
+
+    # bot.sendMessage(chat_id=chat_id,
+                    # text=help_text,
+                    # parse_mode=ParseMode.MARKDOWN,
+                    # disable_web_page_preview=True)
+    keyboard = [[InlineKeyboardButton("connect", callback_data='connect'),InlineKeyboardButton("disconnect", callback_data='disconnect')],
+            [InlineKeyboardButton("play", callback_data='play'),InlineKeyboardButton("stop", callback_data='stop')]]
+
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    bot.sendMessage(update.message.chat_id, text="Нажмите, что бы ваши предпочтения были учитаны при составлении плейлиста", reply_markup=reply_markup)
 
 def addUser(uid,name,bot,update):
     query=Query()
@@ -100,9 +74,6 @@ def addUser(uid,name,bot,update):
     else:
         users.update({"username":name}, query.id == uid)
     
-
-    print(chats.all())
-    print(groupid)
     group_users = chats.search(query["id"] == groupid)[0]['users']
     if uid not in group_users:
         group_users.append(uid)
@@ -118,14 +89,25 @@ def addUser(uid,name,bot,update):
         # users.update({"users":[]}, query.id == update.chat.id)
         # us = chats.table("users")
     # us.insert(uid)
-def uncountUser(bot,update,uid):
+def disconnect(bot,update):
     query=Query()
-    uid = str(uid)
-    groupid = str(update.callback_query.message.chat.id)
+    if update.callback_query:
+        q = update.callback_query
+        qd = q.to_dict()
+        uid = qd['from']['id']
+        groupid = str(update.callback_query.message.chat.id)
+    else:
+        uid = str(update.message.left_chat_member.id)
+        groupid = str(update.message.chat.id)
     group_users = chats.search(query["id"] == groupid)[0]['users']
-    if uid in group_users:
-        group_users.remove(uid)
-        chats.update({"users":group_users}, query.id == groupid)
+    # if uid in group_users:
+    for u in group_users:
+        if str(u) == str(uid):
+            group_users.remove(str(uid))
+            chats.update({"users":group_users}, query.id == groupid)
+            bot.sendMessage(text="@%s, вы более не учитываетесь при составлении плейлиста" % str(users.search(query.id == str(uid))[0]["username"]),
+                                chat_id=groupid)
+    print("disconnect")
 
 def playlist(bot,update):
     chat_id = str(update.message.chat.id)
@@ -172,7 +154,7 @@ def merge_users_values(ulist,chat_id):
 def push_playlist(bot,update,songs):
     bot.sendMessage(update.message.chat_id, text="Playlist")
     for s in songs:
-        bot.sendAudio(update.message.chat_id, audio=open(parser.get(s['file_mp3']), 'rb'))
+        bot.sendAudio(update.message.chat_id, audio=open(parser.get(s['file_mp3']), 'rb'),title=s["track_name"],performer=s["performer"],disable_notification=True)
         
 
 def button(bot, update):
@@ -189,20 +171,24 @@ def connect(bot,update):
     if addUser(user_id,username, bot, update):
         bot.sendMessage(text="@%s, вы учтены при составлении плейлиста" % (username),
                             chat_id=query.message.chat_id)
-    # else:
-        # bot.sendMessage(text="@%s, вы уже были учтены при составлении плейлиста" % (username),
-                            # chat_id=query.message.chat_id)
+    else:
+        bot.sendMessage(text="@%s, вы уже были учтены при составлении плейлиста" % (username),
+                            chat_id=query.message.chat_id)
+
+def play(bot,update):
+    return
+def stop(bot,update):
+    return
+
+callback = {"connect":connect,"disconnect":disconnect,"play":play,"stop":stop}
 
 
-callback = {"connect":connect}
-
-
-def empty_message(bot, update):
+def status_update(bot, update):
     """
     Empty messages could be status messages, so we check them if there is a new
     group member, someone left the chat or if the bot has been added somewhere.
     """
-    print("empty_message")
+    print("status_update")
     # print("The name of new member is '%s' " % update.message.new_chat_member.username)
 
     # Keep chatlist
@@ -212,25 +198,41 @@ def empty_message(bot, update):
         # chats.update({"type":update.message.chat.type}, query.id == str(chat_id))
     chat_id = update.message.chat.id
 
-    if not chats.search(Query()["id"] == str(chat_id)):
-        chats.insert({"id":str(chat_id),"type":update.message.chat.type})
-        logger.info("I have been added to %d chats" % len(chats.all()))
+    # if not chats.search(Query()["id"] == str(chat_id)):
+        # chats.insert({"id":str(chat_id),"type":update.message.chat.type})
+        # logger.info("I have been added to %d chats" % len(chats.all()))
 
     if update.message.new_chat_member is not None:
         logger.debug("The name of new member is '%s' " % update.message.new_chat_member.username)
-        bot.sendMessage(chat_id=chat_id, text=update.message.new_chat_member.username)
-        start(bot,update)
         # Bot was added to a group chat
-        if update.message.new_chat_member.username == BOTNAME:
-            return introduce(bot, update)
+        if update.message.new_chat_member.username == config.BOTNAME:
+            # bot.sendMessage(chat_id=chat_id, text=update.message.new_chat_member.username)
+            added_to_chat(bot,update)
+            start(bot,update)
+            return
         # Another user joined the chat
         else:
-            return welcome(bot, update)
+            return
 
     # Someone left the chat
     elif update.message.left_chat_member is not None:
-        if update.message.left_chat_member.username != BOTNAME:
-            return goodbye(bot, update)
+        if update.message.left_chat_member.username != config.BOTNAME:
+            return disconnect(bot, update)
+        else:
+            removed_from_chat(bot,update)
+
+def added_to_chat(bot,update):
+    chat_id = update.message.chat.id
+    query = Query()
+    # playlists[str(chat_id)] = {}
+    if not chats.search(query["id"] == str(chat_id)):
+        chats.insert({"id":str(chat_id),"type":update.message.chat.type,"lock":True,"quiet":False,"welcome":"hi","goodbye":"bye","users":[]})
+    else:
+        chats.update({"id":str(chat_id),"type":update.message.chat.type,"lock":True,"quiet":False,"welcome":"hi","goodbye":"bye","users":[]}, query.id == str(chat_id))
+    start(bot,update)
+
+def removed_from_chat(bot,update):
+    chats.remove(Query().id == update.message.chat_id)
 
 
 def error(bot, update, error, **kwargs):
@@ -241,7 +243,7 @@ def error(bot, update, error, **kwargs):
                 and error.message == "Unauthorized"\
                 or "PEER_ID_INVALID" in error.message\
                 and isinstance(update, Update):
-                    chats.remove(Query().id == update.message.chat_id)
+                    removed_from_chat(bot,update)
                     logger.info('Removed chat_id %s from chat list' % update.message.chat_id)
         else:
             logger.error("An error (%s) occurred: %s"

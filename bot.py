@@ -23,6 +23,13 @@ logging.basicConfig(level=logging.DEBUG,
 
 logger = logging.getLogger(__name__)
 
+
+
+
+def none(bot,update):
+    chat_id = update.message.chat.id
+    bot.sendMessage(chat_id=chat_id, text="недопустимая команда для этого чата")
+
 handler ={
         "start":{
             "group":group.start,
@@ -39,6 +46,16 @@ handler ={
             "supergroup":group.button,
             "personal":personal.button,
             },
+        "playlist":{
+            "group":group.playlist,
+            "supergroup":group.playlist,
+            "personal":personal.playlist,
+            },
+        "status_update":{
+            "group":group.status_update,
+            "supergroup":group.status_update,
+            "personal":none,
+            }
         }
 
 
@@ -69,12 +86,13 @@ def playlist(bot,update):
 def button(bot,update):
     handler["button"][update.callback_query.message.chat.type](bot,update)
 
-def empty_message(bot, update):
-    bot.sendMessage(update.message.chat_id, text="empty")
+def status_update(bot, update):
+    handler["status_update"][update.message.chat.type](bot,update)
 
 def main():
     # Create the Updater and pass it your bot's token.
     updater = Updater(config.TOKEN, workers=config.WORKERS)
+    j = updater.job_queue
 
     # Get the dispatcher to register handlers
     dp = updater.dispatcher
@@ -84,8 +102,9 @@ def main():
     dp.add_handler(CommandHandler("playlist", playlist))
     
     dp.add_handler(CallbackQueryHandler(button))
-    dp.add_handler(StringRegexHandler('^$', empty_message))
-    # dp.add_handler(StringCommandHandler('', empty_message))
+    dp.add_handler(MessageHandler([Filters.status_update], status_update))
+
+    # dp.add_handler(StringCommandHandler('', status_update))
 
     # dp.add_handler(StringCommandHandler('level', set_log_level))
     # dp.add_handler(StringCommandHandler('count', chatcount))
